@@ -6,7 +6,7 @@ import yaml
 import mlflow
 import mlflow.sklearn
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -55,12 +55,12 @@ def load_model(model_path: str):
         raise
 
 
-def load_vectorizer(vectorizer_path: str) -> TfidfVectorizer:
-    """Load the saved TF-IDF vectorizer."""
+def load_vectorizer(vectorizer_path: str) -> CountVectorizer:
+    """Load the saved BOW vectorizer."""
     try:
         with open(vectorizer_path, 'rb') as file:
             vectorizer = pickle.load(file)
-        logger.debug('TF-IDF vectorizer loaded from %s', vectorizer_path)
+        logger.debug('BOW vectorizer loaded from %s', vectorizer_path)
         return vectorizer
     except Exception as e:
         logger.error('Error loading vectorizer from %s: %s', vectorizer_path, e)
@@ -127,7 +127,7 @@ def save_model_info(run_id: str, model_path: str, file_path: str) -> None:
 
 
 def main():
-    mlflow.set_tracking_uri("http://ec2-3-84-223-136.compute-1.amazonaws.com:5000/")
+    mlflow.set_tracking_uri("http://ec2-18-133-28-185.eu-west-2.compute.amazonaws.com:5000/")
 
     mlflow.set_experiment('dvc-pipeline-runs')
     
@@ -143,20 +143,23 @@ def main():
             
             # Load model and vectorizer
             model = load_model(os.path.join(root_dir, 'lgbm_model.pkl'))
-            vectorizer = load_vectorizer(os.path.join(root_dir, 'tfidf_vectorizer.pkl'))
+            vectorizer = load_vectorizer(os.path.join(root_dir, 'bow_vectorizer.pkl'))
 
             # Load test data for signature inference
             test_data = load_data(os.path.join(root_dir, 'data/interim/test_processed.csv'))
 
             # Prepare test data
-            X_test_tfidf = vectorizer.transform(test_data['clean_comment'].values)
+            X_test_bow = vectorizer.transform(test_data['clean_comment'].values)
             y_test = test_data['category'].values
 
+            # Convert features to float32 for LightGBM compatibility
+            X_test_bow = X_test_bow.astype(np.float32)
+            
             # Create a DataFrame for signature inference (using first few rows as an example)
-            input_example = pd.DataFrame(X_test_tfidf.toarray()[:5], columns=vectorizer.get_feature_names_out())  # <--- Added for signature
+            input_example = pd.DataFrame(X_test_bow.toarray()[:5], columns=vectorizer.get_feature_names_out())  # <--- Added for signature
 
             # Infer the signature
-            signature = infer_signature(input_example, model.predict(X_test_tfidf[:5]))  # <--- Added for signature
+            signature = infer_signature(input_example, model.predict(X_test_bow[:5]))  # <--- Added for signature
 
             # Log model with signature
             mlflow.sklearn.log_model(
@@ -172,10 +175,10 @@ def main():
             save_model_info(run.info.run_id, model_path, 'experiment_info.json')
 
             # Log the vectorizer as an artifact
-            mlflow.log_artifact(os.path.join(root_dir, 'tfidf_vectorizer.pkl'))
+            mlflow.log_artifact(os.path.join(root_dir, 'bow_vectorizer.pkl'))
 
             # Evaluate model and get metrics
-            report, cm = evaluate_model(model, X_test_tfidf, y_test)
+            report, cm = evaluate_model(model, X_test_bow, y_test)
 
             # Log classification report metrics for the test data
             for label, metrics in report.items():

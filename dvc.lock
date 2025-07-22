@@ -37,3 +37,71 @@ stages:
       md5: ba42408e7bd1e85685474d6a349ae57e.dir
       size: 5134850
       nfiles: 2
+  model_building:
+    cmd: python src/model/model_building.py
+    deps:
+    - path: data/interim/train_processed.csv
+      hash: md5
+      md5: 35027dfda8274bd9356544f2ff358aa4
+      size: 4134324
+    - path: src/model/model_building.py
+      hash: md5
+      md5: bc0d91c182725b8bffc1002c4a449c6d
+      size: 5733
+    params:
+      params.yaml:
+        model_building.learning_rate: 0.06
+        model_building.max_depth: 15
+        model_building.max_features: 1000
+        model_building.n_estimators: 834
+        model_building.ngram_range:
+        - 1
+        - 2
+    outs:
+    - path: bow_vectorizer.pkl
+      hash: md5
+      md5: 89f3ba7f4aa68ce88a9508585b0a30fb
+      size: 28399
+    - path: lgbm_model.pkl
+      hash: md5
+      md5: 72d6110a41101dc054e0a7ab60644b83
+      size: 8809981
+  model_evaluation:
+    cmd: python src/model/model_evaluation.py
+    deps:
+    - path: bow_vectorizer.pkl
+      hash: md5
+      md5: 89f3ba7f4aa68ce88a9508585b0a30fb
+      size: 28399
+    - path: data/interim/test_processed.csv
+      hash: md5
+      md5: 4f30375397ec89fead1745ee6d70f201
+      size: 1000526
+    - path: data/interim/train_processed.csv
+      hash: md5
+      md5: 35027dfda8274bd9356544f2ff358aa4
+      size: 4134324
+    - path: lgbm_model.pkl
+      hash: md5
+      md5: 72d6110a41101dc054e0a7ab60644b83
+      size: 8809981
+    - path: src/model/model_evaluation.py
+      hash: md5
+      md5: e5adea5534af8293b8acff5254054c43
+      size: 7514
+    outs:
+    - path: experiment_info.json
+      hash: md5
+      md5: 9bf7a0aff04ab8e035e7dc0575974203
+      size: 172
+  model_registration:
+    cmd: python src/model/register_model.py
+    deps:
+    - path: experiment_info.json
+      hash: md5
+      md5: 9bf7a0aff04ab8e035e7dc0575974203
+      size: 172
+    - path: src/model/register_model.py
+      hash: md5
+      md5: 7cb8139d7c6736189161390423202dd7
+      size: 2475

@@ -5,7 +5,7 @@ import pickle
 import yaml
 import logging
 import lightgbm as lgb
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 
 # logging configuration
 logger = logging.getLogger('model_building')
@@ -58,27 +58,27 @@ def load_data(file_path: str) -> pd.DataFrame:
         raise
 
 
-def apply_tfidf(train_data: pd.DataFrame, max_features: int, ngram_range: tuple) -> tuple:
-    """Apply TF-IDF with ngrams to the data."""
+def apply_bow(train_data: pd.DataFrame, max_features: int, ngram_range: tuple) -> tuple:
+    """Apply BOW with ngrams to the data."""
     try:
-        vectorizer = TfidfVectorizer(max_features=max_features, ngram_range=ngram_range)
+        vectorizer = CountVectorizer(max_features=max_features, ngram_range=ngram_range)
 
         X_train = train_data['clean_comment'].values
         y_train = train_data['category'].values
 
-        # Perform TF-IDF transformation
-        X_train_tfidf = vectorizer.fit_transform(X_train)
-
-        logger.debug(f"TF-IDF transformation complete. Train shape: {X_train_tfidf.shape}")
+        # Perform BOW transformation
+        X_train_bow = vectorizer.fit_transform(X_train)
+        
+        logger.debug(f"BOW transformation complete. Train shape: {X_train_bow.shape}")
 
         # Save the vectorizer in the root directory
-        with open(os.path.join(get_root_directory(), 'tfidf_vectorizer.pkl'), 'wb') as f:
+        with open(os.path.join(get_root_directory(), 'bow_vectorizer.pkl'), 'wb') as f:
             pickle.dump(vectorizer, f)
 
-        logger.debug('TF-IDF applied with trigrams and data transformed')
-        return X_train_tfidf, y_train
+        logger.debug('BOW applied with trigrams and data transformed')
+        return X_train_bow, y_train
     except Exception as e:
-        logger.error('Error during TF-IDF transformation: %s', e)
+        logger.error('Error during BOW transformation: %s', e)
         raise
 
 
@@ -139,11 +139,14 @@ def main():
         # Load the preprocessed training data from the interim directory
         train_data = load_data(os.path.join(root_dir, 'data/interim/train_processed.csv'))
 
-        # Apply TF-IDF feature engineering on training data
-        X_train_tfidf, y_train = apply_tfidf(train_data, max_features, ngram_range)
+        # Apply BOW feature engineering on training data
+        X_train_bow, y_train = apply_bow(train_data, max_features, ngram_range)
+        
+        # Convert features to float32 for LightGBM compatibility
+        X_train_bow = X_train_bow.astype(np.float32)
 
         # Train the LightGBM model using hyperparameters from params.yaml
-        best_model = train_lgbm(X_train_tfidf, y_train, learning_rate, max_depth, n_estimators)
+        best_model = train_lgbm(X_train_bow, y_train, learning_rate, max_depth, n_estimators)
 
         # Save the trained model in the root directory
         save_model(best_model, os.path.join(root_dir, 'lgbm_model.pkl'))
